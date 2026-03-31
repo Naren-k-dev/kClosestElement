@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find K Closest — Sliding Window Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0e17;
+    --bg2:       #0f1522;
+    --bg3:       #161d2e;
+    --bg4:       #1c2540;
+    --border:    rgba(255,255,255,0.06);
+    --border2:   rgba(255,255,255,0.12);
+    --text:      #dde3f0;
+    --muted:     #5a6480;
+    --dim:       #3a4260;
+
+    /* Palette */
+    --cyan:      #00e5ff;
+    --amber:     #ffb830;
+    --rose:      #ff4d6d;
+    --lime:      #a3e635;
+    --violet:    #8b5cf6;
+    --sky:       #38bdf8;
+
+    /* Role colors */
+    --left-c:    #00e5ff;   /* left pointer  */
+    --right-c:   #ff4d6d;   /* right pointer */
+    --win-c:     #a3e635;   /* inside window */
+    --compare-c: #ffb830;   /* currently compared */
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated mesh background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 800px 500px at 20% 10%, rgba(0,229,255,0.04) 0%, transparent 70%),
+      radial-gradient(ellipse 600px 600px at 80% 80%, rgba(255,77,109,0.04) 0%, transparent 70%),
+      radial-gradient(ellipse 500px 400px at 50% 50%, rgba(139,92,246,0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanline effect */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 24px 100px;
+  }
+
+  /* ── Header ── */
+  header {
+    margin-bottom: 44px;
+    animation: fadeUp .6s ease both;
+  }
+  .header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .badge-lc   { background: rgba(255,184,48,0.08); border-color: rgba(255,184,48,0.3); color: var(--amber); }
+  .badge-alg  { background: rgba(0,229,255,0.06);  border-color: rgba(0,229,255,0.2);  color: var(--cyan); }
+  .kbd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 5px;
+    padding: 3px 8px;
+    color: var(--muted);
+  }
+  h1 {
+    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  h1 span.hl { color: var(--cyan); }
+  h1 span.hl2 { color: var(--amber); }
+  .subtitle { font-size: 14px; color: var(--muted); font-weight: 300; }
+
+  /* ── Idea box ── */
+  .idea-box {
+    background: linear-gradient(135deg, rgba(0,229,255,0.05), rgba(139,92,246,0.05));
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #8fa0c0;
+    animation: fadeUp .6s .1s ease both;
+  }
+  .idea-box strong { color: var(--cyan); font-weight: 600; }
+
+  /* ── Card ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px 24px;
+    margin-bottom: 14px;
+    animation: fadeUp .6s ease both;
+    position: relative;
+  }
+  .card-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-label .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ── Inputs ── */
+  .inputs-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 100px;
+    gap: 14px;
+    align-items: end;
+  }
+  @media(max-width:560px){ .inputs-row { grid-template-columns:1fr; } }
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .field input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,229,255,.08); }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  button {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    padding: 10px 20px;
+    transition: transform .12s, box-shadow .2s, opacity .15s;
+  }
+  button:active:not(:disabled) { transform: scale(.96); }
+  button:disabled { opacity: .3; cursor: not-allowed; }
+
+  .btn-start  { background: var(--cyan);   color: #060a12; box-shadow: 0 0 20px rgba(0,229,255,.25); }
+  .btn-start:hover:not(:disabled)  { box-shadow: 0 0 36px rgba(0,229,255,.45); }
+  .btn-next   { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); }
+  .btn-next:hover:not(:disabled)   { border-color: var(--cyan); color: var(--cyan); }
+  .btn-auto   { background: linear-gradient(135deg, var(--violet), var(--sky)); color: #fff; }
+  .btn-auto.playing { background: linear-gradient(135deg, var(--amber), var(--rose)); }
+  .btn-reset  { background: var(--bg3); color: var(--rose); border: 1px solid rgba(255,77,109,.25); }
+  .err { font-size: 12px; color: var(--rose); margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Progress ── */
+  .progress-track {
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--violet), var(--rose));
+    border-radius: 2px;
+    transition: width .4s ease;
+    box-shadow: 0 0 12px rgba(0,229,255,.6);
+    width: 0%;
+  }
+
+  /* ── Array visualization ── */
+  .array-outer { overflow-x: auto; padding-bottom: 8px; }
+  .array-wrap {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    padding: 20px 4px 12px;
+    min-width: max-content;
+    position: relative;
+  }
+
+  .cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    position: relative;
+  }
+
+  /* pointer arrows above box */
+  .ptr-arrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  .ptr-arrow.show { opacity: 1; }
+  .ptr-left  { color: var(--left-c); }
+  .ptr-right { color: var(--right-c); }
+  .ptr-both  { color: var(--amber); }
+
+  .box {
+    width: 50px; height: 50px;
+    border-radius: 12px;
+    border: 1.5px solid var(--border2);
+    background: var(--bg3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--dim);
+    position: relative;
+    transition:
+      background .3s, border-color .3s, box-shadow .3s,
+      color .3s, transform .3s;
+    cursor: default;
+  }
+
+  /* Inside window = lime */
+  .box.in-win {
+    background: rgba(163,230,53,.1);
+    border-color: var(--lime);
+    color: var(--lime);
+    box-shadow: 0 0 14px rgba(163,230,53,.2);
+  }
+  /* left pointer candidate (being compared) */
+  .box.cmp-left {
+    background: rgba(0,229,255,.13);
+    border-color: var(--left-c);
+    color: var(--left-c);
+    box-shadow: 0 0 18px rgba(0,229,255,.3);
+    animation: pulse-cyan 1s ease-in-out infinite;
+  }
+  /* right pointer candidate */
+  .box.cmp-right {
+    background: rgba(255,77,109,.13);
+    border-color: var(--right-c);
+    color: var(--right-c);
+    box-shadow: 0 0 18px rgba(255,77,109,.3);
+    animation: pulse-rose 1s ease-in-out infinite;
+  }
+  /* the one being dropped (loser) */
+  .box.drop {
+    background: rgba(255,184,48,.1);
+    border-color: var(--amber);
+    color: var(--amber);
+    box-shadow: 0 0 18px rgba(255,184,48,.3);
+    animation: shake .35s ease;
+  }
+  /* final */
+  .box.final {
+    background: rgba(163,230,53,.16);
+    border-color: var(--lime);
+    color: var(--lime);
+    box-shadow: 0 0 24px rgba(163,230,53,.45);
+    animation: glow-lime 2s ease-in-out infinite;
+    transform: translateY(-3px);
+  }
+
+  @keyframes pulse-cyan { 0%,100%{box-shadow:0 0 14px rgba(0,229,255,.25)} 50%{box-shadow:0 0 28px rgba(0,229,255,.55)} }
+  @keyframes pulse-rose { 0%,100%{box-shadow:0 0 14px rgba(255,77,109,.25)} 50%{box-shadow:0 0 28px rgba(255,77,109,.55)} }
+  @keyframes glow-lime  { 0%,100%{box-shadow:0 0 20px rgba(163,230,53,.35)} 50%{box-shadow:0 0 42px rgba(163,230,53,.7)} }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)}
+    25%{transform:translateX(-4px)}
+    75%{transform:translateX(4px)}
+  }
+
+  .cell-idx {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .leg { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .leg-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+  /* ── Pointer display (big L / R) ── */
+  .ptrs-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+  }
+  .ptr-chip {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 10px 18px;
+    min-width: 120px;
+    transition: border-color .3s;
+  }
+  .ptr-chip.active-l { border-color: var(--left-c); box-shadow: 0 0 12px rgba(0,229,255,.15); }
+  .ptr-chip.active-r { border-color: var(--right-c); box-shadow: 0 0 12px rgba(255,77,109,.15); }
+  .ptr-sym {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 60px;
+    color: var(--muted);
+  }
+  .ptr-sym.cl { color: var(--left-c); }
+  .ptr-sym.cr { color: var(--right-c); }
+  .ptr-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    transition: color .3s;
+  }
+  .win-size-chip {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(163,230,53,.06);
+    border: 1px solid rgba(163,230,53,.2);
+    border-radius: 12px;
+    padding: 10px 18px;
+  }
+  .win-size-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .win-size-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--lime);
+    transition: color .3s;
+  }
+
+  /* ── Step explanation ── */
+  .step-box {
+    font-size: 14px;
+    line-height: 1.85;
+    color: #8fa0c0;
+  }
+  .step-box strong   { color: var(--text); font-weight: 600; }
+  .step-box .cl { color: var(--left-c); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  .step-box .cr { color: var(--right-c); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  .step-box .ca { color: var(--amber); font-weight: 600; }
+  .step-box .cg { color: var(--lime); font-weight: 600; }
+
+  /* Condition row */
+  .cond-row {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding-top: 14px; margin-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .cond-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .cc-left  { background: rgba(0,229,255,.08); border-color: rgba(0,229,255,.3); color: var(--left-c); }
+  .cc-right { background: rgba(255,77,109,.08); border-color: rgba(255,77,109,.3); color: var(--right-c); }
+  .cc-op    { background: transparent; border-color: transparent; color: var(--muted); font-size: 16px; }
+  .cc-res   { background: rgba(163,230,53,.08); border-color: rgba(163,230,53,.3); color: var(--lime); }
+
+  /* ── Code snippet ── */
+  .code-block {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.9;
+    color: #607090;
+    overflow-x: auto;
+    margin-top: 14px;
+  }
+  .code-block .kw   { color: var(--violet); }
+  .code-block .fn   { color: var(--sky); }
+  .code-block .str  { color: var(--lime); }
+  .code-block .cmt  { color: var(--dim); font-style: italic; }
+  .code-block .hl-line {
+    display: block;
+    background: rgba(255,184,48,.08);
+    border-left: 2px solid var(--amber);
+    margin: 0 -20px;
+    padding: 0 20px;
+    color: var(--amber);
+    transition: background .3s, border-color .3s;
+  }
+
+  /* ── Result banner ── */
+  .result-banner {
+    background: linear-gradient(135deg, rgba(163,230,53,.07), rgba(0,229,255,.05));
+    border: 1.5px solid var(--lime);
+    border-radius: 18px;
+    padding: 22px 26px;
+    display: none;
+    margin-top: 4px;
+    animation: popIn .5s cubic-bezier(.34,1.56,.64,1) both;
+    position: relative;
+    overflow: hidden;
+  }
+  .result-banner::before {
+    content:'';
+    position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, var(--lime), var(--cyan), var(--violet));
+  }
+  .result-banner.show { display: block; }
+  .res-label { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--lime); font-weight:700; margin-bottom:8px; }
+  .res-val {
+    font-family:'JetBrains Mono', monospace;
+    font-size: 20px; font-weight:700; color: var(--text);
+    margin-bottom: 6px;
+  }
+  .res-sub { font-size: 12px; color: var(--muted); }
+
+  /* ── Complexity pills ── */
+  .complexity-row {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;
+  }
+  .cx-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .cx-t { background: rgba(0,229,255,.06); border-color: rgba(0,229,255,.2); color: var(--cyan); }
+  .cx-s { background: rgba(139,92,246,.06); border-color: rgba(139,92,246,.2); color: var(--violet); }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(18px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes popIn {
+    0%  { opacity:0; transform:scale(.93) translateY(8px); }
+    100%{ opacity:1; transform:scale(1)   translateY(0); }
+  }
+
+  /* stagger cards */
+  .card:nth-child(1){animation-delay:.05s}
+  .card:nth-child(2){animation-delay:.12s}
+  .card:nth-child(3){animation-delay:.19s}
+  .card:nth-child(4){animation-delay:.26s}
+  .card:nth-child(5){animation-delay:.33s}
+
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+
+  /* Step counter badge */
+  .step-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: rgba(139,92,246,.1);
+    border: 1px solid rgba(139,92,246,.25);
+    color: var(--violet);
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-left: auto;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header>
+    <div class="header-top">
+      <div class="badge-row">
+        <div class="badge badge-lc">LC #658 · Medium</div>
+        <div class="badge badge-alg">Two-Pointer · O(n−k)</div>
+      </div>
+      <div class="badge-row">
+        <span class="kbd">Space</span><span style="font-size:11px;color:var(--muted)"> next step</span>
+        <span class="kbd">R</span><span style="font-size:11px;color:var(--muted)"> reset</span>
+      </div>
+    </div>
+    <h1>Find <span class="hl">K</span> Closest <span class="hl2">Elements</span></h1>
+    <p class="subtitle">Two-pointer shrinking window — visualize every comparison and drop</p>
+  </header>
+
+  <!-- Idea -->
+  <div class="idea-box">
+    <strong>Core idea:</strong> Start with the full array window. At each step, compare the <strong style="color:var(--left-c)">left</strong> and <strong style="color:var(--right-c)">right</strong> elements' distances from <strong>x</strong>.
+    Whichever is <em>farther</em> (or equal — prefer keeping left) gets <strong style="color:var(--amber)">dropped</strong>.
+    Repeat until the window has exactly <strong>k</strong> elements.
+  </div>
+
+  <!-- Config -->
+  <div class="card">
+    <div class="card-label"><span class="dot"></span>Configuration</div>
+    <div class="inputs-row">
+      <div class="field">
+        <label>Sorted Array</label>
+        <input type="text" id="inp-arr" value="1,2,3,4,5,6,7,8,9,10" placeholder="e.g. 1,3,5,7,9">
+      </div>
+      <div class="field">
+        <label>k</label>
+        <input type="number" id="inp-k" value="4" min="1">
+      </div>
+      <div class="field">
+        <label>x</label>
+        <input type="number" id="inp-x" value="6">
+      </div>
+    </div>
+    <div id="inp-err" class="err"></div>
+    <div class="btn-row">
+      <button class="btn-start" id="btn-start">▶  Start</button>
+      <button class="btn-next"  id="btn-next"  disabled>Next Step →</button>
+      <button class="btn-auto"  id="btn-auto"  disabled>⚡ Auto-play</button>
+      <button class="btn-reset" id="btn-reset" disabled>↺  Reset</button>
+    </div>
+  </div>
+
+  <!-- Array -->
+  <div class="card">
+    <div class="card-label" style="justify-content:space-between">
+      <span><span class="dot"></span>Window Visualization</span>
+      <span class="step-badge" id="step-badge" style="display:none">Step <span id="step-num">0</span></span>
+    </div>
+
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:rgba(0,229,255,.3);border:1px solid var(--left-c)"></div>Left pointer</div>
+      <div class="leg"><div class="leg-dot" style="background:rgba(255,77,109,.3);border:1px solid var(--right-c)"></div>Right pointer</div>
+      <div class="leg"><div class="leg-dot" style="background:rgba(163,230,53,.2);border:1px solid var(--lime)"></div>Inside window</div>
+      <div class="leg"><div class="leg-dot" style="background:rgba(255,184,48,.2);border:1px solid var(--amber)"></div>Being dropped</div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+
+    <div class="array-outer">
+      <div class="array-wrap" id="array-wrap">
+        <span style="color:var(--muted);font-size:13px">Press <strong style="color:var(--cyan)">Start</strong> to load the array.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pointers -->
+  <div class="card">
+    <div class="card-label"><span class="dot"></span>Pointer State</div>
+    <div class="ptrs-row">
+      <div class="ptr-chip" id="pc-left">
+        <span class="ptr-sym cl">left</span>
+        <span class="ptr-num" id="v-left">—</span>
+      </div>
+      <div class="ptr-chip" id="pc-right">
+        <span class="ptr-sym cr">right</span>
+        <span class="ptr-num" id="v-right">—</span>
+      </div>
+      <div class="win-size-chip">
+        <span class="win-size-label">window</span>
+        <span class="win-size-val" id="v-winsize">—</span>
+      </div>
+      <div class="ptr-chip">
+        <span class="ptr-sym" style="color:var(--amber)">x =</span>
+        <span class="ptr-num" id="v-x" style="color:var(--amber)">—</span>
+      </div>
+      <div class="ptr-chip">
+        <span class="ptr-sym" style="color:var(--violet)">k =</span>
+        <span class="ptr-num" id="v-k" style="color:var(--violet)">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Explanation -->
+  <div class="card">
+    <div class="card-label"><span class="dot"></span>Step Explanation</div>
+    <div class="step-box" id="explain">
+      Press <strong>Start</strong> to begin the walkthrough.
+    </div>
+    <div class="cond-row" id="cond-row"></div>
+
+    <!-- Highlighted code -->
+    <div class="code-block" id="code-block">
+<span class="kw">while</span> (right - left + <span class="str">1</span> > k) {
+    <span class="cmt">// Compare distances of both ends from x</span>
+    <span class="kw">if</span> (Math.<span class="fn">abs</span>(arr[left] - x) > Math.<span class="fn">abs</span>(arr[right] - x)) {
+        left++;   <span class="cmt">// left is farther → drop it</span>
+    } <span class="kw">else</span> {
+        right--;  <span class="cmt">// right is farther or equal → drop it</span>
+    }
+}
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-banner" id="result-banner">
+    <div class="res-label">✦ Result</div>
+    <div class="res-val" id="res-val"></div>
+    <div class="res-sub" id="res-sub"></div>
+    <div class="complexity-row">
+      <div class="cx-pill cx-t">Time: O(n − k)</div>
+      <div class="cx-pill cx-s">Space: O(1)</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ── State ─────────────────────────────────────────── */
+let arr = [], k = 0, x = 0;
+let left = 0, right = 0;
+let done = false, started = false;
+let stepCount = 0, totalDrops = 0;
+let autoTimer = null;
+let lastDropDir = null; // 'left' | 'right'
+
+/* ── DOM ────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const inpArr   = $('inp-arr');
+const inpK     = $('inp-k');
+const inpX     = $('inp-x');
+const inpErr   = $('inp-err');
+const arrayWrap= $('array-wrap');
+const btnStart = $('btn-start');
+const btnNext  = $('btn-next');
+const btnAuto  = $('btn-auto');
+const btnReset = $('btn-reset');
+const vLeft    = $('v-left');
+const vRight   = $('v-right');
+const vWinsize = $('v-winsize');
+const vX       = $('v-x');
+const vK       = $('v-k');
+const explain  = $('explain');
+const condRow  = $('cond-row');
+const progress = $('progress');
+const stepBadge= $('step-badge');
+const stepNum  = $('step-num');
+const resBanner= $('result-banner');
+const resVal   = $('res-val');
+const resSub   = $('res-sub');
+const codeBlock= $('code-block');
+const pcLeft   = $('pc-left');
+const pcRight  = $('pc-right');
+
+/* ── Render array ───────────────────────────────────── */
+/*
+  States per cell:
+    'cmp-left'  — left pointer (being compared)
+    'cmp-right' — right pointer (being compared)
+    'in-win'    — inside window but not pointer
+    'drop'      — the one being dropped this step
+    'final'     — final window
+    'out'       — outside window
+*/
+function renderArray(state) {
+  // state: { left, right, dropIdx, isFinal }
+  arrayWrap.innerHTML = '';
+
+  arr.forEach((val, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+
+    /* pointer arrow row */
+    const ptrEl = document.createElement('div');
+    const isL = (i === state.left);
+    const isR = (i === state.right);
+    if (isL && isR) {
+      ptrEl.className = 'ptr-arrow show ptr-both';
+      ptrEl.innerHTML = '▼ L &amp; R';
+    } else if (isL) {
+      ptrEl.className = 'ptr-arrow show ptr-left';
+      ptrEl.innerHTML = '▼ left';
+    } else if (isR) {
+      ptrEl.className = 'ptr-arrow show ptr-right';
+      ptrEl.innerHTML = '▼ right';
+    } else {
+      ptrEl.className = 'ptr-arrow';
+      ptrEl.textContent = '';
+    }
+
+    const box = document.createElement('div');
+    box.className = 'box';
+    box.textContent = val;
+
+    const inWin = (i >= state.left && i <= state.right);
+
+    if (state.isFinal && inWin) {
+      box.classList.add('final');
+    } else if (state.dropIdx === i) {
+      box.classList.add('drop');
+    } else if (isL && !state.isFinal) {
+      box.classList.add('cmp-left');
+    } else if (isR && !state.isFinal) {
+      box.classList.add('cmp-right');
+    } else if (inWin) {
+      box.classList.add('in-win');
+    }
+
+    const idx = document.createElement('div');
+    idx.className = 'cell-idx';
+    idx.textContent = i;
+
+    cell.appendChild(ptrEl);
+    cell.appendChild(box);
+    cell.appendChild(idx);
+    arrayWrap.appendChild(cell);
+  });
+}
+
+/* ── Set pointer chips ──────────────────────────────── */
+function setPointers(l, r) {
+  vLeft.textContent    = l !== undefined ? l : '—';
+  vRight.textContent   = r !== undefined ? r : '—';
+  vWinsize.textContent = (l !== undefined && r !== undefined) ? (r - l + 1) : '—';
+  vX.textContent       = started ? x : '—';
+  vK.textContent       = started ? k : '—';
+}
+
+/* ── Set condition row ──────────────────────────────── */
+function setCondition(leftVal, rightVal, dropped) {
+  condRow.innerHTML = '';
+  const dl = Math.abs(leftVal - x);
+  const dr = Math.abs(rightVal - x);
+
+  const c1 = document.createElement('div');
+  c1.className = 'cond-chip cc-left';
+  c1.innerHTML = `|arr[left]−x| = |${leftVal}−${x}| = <b>${dl}</b>`;
+
+  const op = document.createElement('div');
+  op.className = 'cond-chip cc-op';
+  op.textContent = dl > dr ? '>' : '=';
+
+  const c2 = document.createElement('div');
+  c2.className = 'cond-chip cc-right';
+  c2.innerHTML = `|arr[right]−x| = |${rightVal}−${x}| = <b>${dr}</b>`;
+
+  const res = document.createElement('div');
+  res.className = 'cond-chip cc-res';
+  res.textContent = '→ drop ' + dropped;
+
+  [c1, op, c2, res].forEach(el => condRow.appendChild(el));
+}
+
+/* ── Highlight code line ──────────────────────────────── */
+function highlightCode(dropDir) {
+  // dropDir: 'left' | 'right' | 'none' | 'done'
+  const leftLine  = `    <span class="kw">if</span> (Math.<span class="fn">abs</span>(arr[left] - x) > Math.<span class="fn">abs</span>(arr[right] - x)) {`;
+  const leftDrop  = `        left++;   <span class="cmt">// left is farther → drop it</span>`;
+  const rightDrop = `        right--;  <span class="cmt">// right is farther or equal → drop it</span>`;
+  const whl       = `<span class="kw">while</span> (right - left + <span class="str">1</span> > k) {`;
+
+  if (dropDir === 'left') {
+    codeBlock.innerHTML =
+`${whl}
+    <span class="cmt">// Compare distances of both ends from x</span>
+<span class="hl-line">${leftLine}</span>
+<span class="hl-line">${leftDrop}</span>
+    } <span class="kw">else</span> {
+        right--;  <span class="cmt">// right is farther or equal → drop it</span>
+    }
+}`;
+  } else if (dropDir === 'right') {
+    codeBlock.innerHTML =
+`${whl}
+    <span class="cmt">// Compare distances of both ends from x</span>
+${leftLine}
+        left++;   <span class="cmt">// left is farther → drop it</span>
+    } <span class="kw">else</span> {
+<span class="hl-line">${rightDrop}</span>
+    }
+}`;
+  } else {
+    codeBlock.innerHTML =
+`${whl}
+    <span class="cmt">// Compare distances of both ends from x</span>
+${leftLine}
+${leftDrop}
+    } <span class="kw">else</span> {
+${rightDrop}
+    }
+}`;
+  }
+}
+
+/* ── Update progress ──────────────────────────────────── */
+function updateProgress() {
+  if (totalDrops === 0) { progress.style.width = '0%'; return; }
+  const pct = Math.min(100, Math.round((stepCount / totalDrops) * 100));
+  progress.style.width = pct + '%';
+  stepNum.textContent = stepCount;
+}
+
+/* ── START ──────────────────────────────────────────── */
+function start() {
+  const rawArr = inpArr.value.trim().split(',').map(s => parseInt(s.trim(), 10));
+  const kv = parseInt(inpK.value, 10);
+  const xv = parseInt(inpX.value, 10);
+  inpErr.textContent = '';
+
+  if (rawArr.some(isNaN))       { inpErr.textContent = '✖ Array must be comma-separated integers.'; return; }
+  if (isNaN(kv) || kv < 1)     { inpErr.textContent = '✖ k must be a positive integer.'; return; }
+  if (kv > rawArr.length)      { inpErr.textContent = '✖ k cannot exceed array length.'; return; }
+  if (isNaN(xv))                { inpErr.textContent = '✖ x must be an integer.'; return; }
+  for (let i = 1; i < rawArr.length; i++) {
+    if (rawArr[i] < rawArr[i-1]) { inpErr.textContent = '✖ Array must be sorted (non-decreasing).'; return; }
+  }
+
+  arr = rawArr; k = kv; x = xv;
+  left = 0; right = arr.length - 1;
+  done = false; started = true; stepCount = 0;
+  totalDrops = arr.length - k;  // exactly (n-k) drops needed
+
+  resBanner.classList.remove('show');
+  btnStart.disabled = true;
+  btnNext.disabled  = false;
+  btnAuto.disabled  = false;
+  btnReset.disabled = false;
+  inpArr.disabled = inpK.disabled = inpX.disabled = true;
+  stepBadge.style.display = 'inline-flex';
+
+  renderArray({ left, right, dropIdx: null, isFinal: false });
+  setPointers(left, right);
+  updateProgress();
+  highlightCode('none');
+
+  explain.innerHTML =
+    `<strong>Initialized.</strong> Window covers the full array: indices <span class="cl">${left}</span> → <span class="cr">${right}</span>.<br>
+     Window size = <span class="cg">${arr.length}</span>, need to shrink to <span class="cg">${k}</span> by dropping <span class="ca">${totalDrops}</span> element${totalDrops !== 1 ? 's' : ''}.<br>
+     Each step: compare <span class="cl">arr[left]</span> and <span class="cr">arr[right]</span> distances from x = <strong>${x}</strong>. Drop the farther one.`;
+  condRow.innerHTML = '';
+}
+
+/* ── STEP ───────────────────────────────────────────── */
+function step() {
+  if (!started || done) return;
+
+  const winSize = right - left + 1;
+
+  if (winSize <= k) {
+    // Done
+    done = true;
+    renderArray({ left, right, dropIdx: null, isFinal: true });
+    setPointers(left, right);
+    progress.style.width = '100%';
+    highlightCode('none');
+
+    const result = arr.slice(left, right + 1);
+    explain.innerHTML =
+      `<strong>✦ Done!</strong> Window size = <span class="cg">${winSize}</span> = k. No more drops needed.<br>
+       The <span class="cg">${k}</span> closest elements to x = <strong>${x}</strong> are at indices <span class="cl">${left}</span> → <span class="cr">${right}</span>.`;
+    condRow.innerHTML = '';
+
+    resVal.textContent = `[ ${result.join('  ,  ')} ]`;
+    resSub.textContent = `Indices ${left} to ${right} — window size = ${k}`;
+    resBanner.classList.add('show');
+    btnNext.disabled = true;
+    btnAuto.disabled = true;
+    stopAuto();
+    return;
+  }
+
+  const leftVal  = arr[left];
+  const rightVal = arr[right];
+  const dl = Math.abs(leftVal - x);
+  const dr = Math.abs(rightVal - x);
+  const dropLeft = dl > dr;
+  const dropIdx  = dropLeft ? left : right;
+
+  stepCount++;
+  updateProgress();
+
+  // Show the drop first (highlight the box being removed)
+  renderArray({ left, right, dropIdx, isFinal: false });
+  setPointers(left, right);
+  highlightCode(dropLeft ? 'left' : 'right');
+  setCondition(leftVal, rightVal, dropLeft ? 'left' : 'right');
+
+  let reason;
+  if (dropLeft) {
+    reason = `<span class="cl">arr[left] = ${leftVal}</span> is farther from x (distance <span class="ca">${dl}</span>) than <span class="cr">arr[right] = ${rightVal}</span> (distance <span class="ca">${dr}</span>).<br>Condition <code>dl > dr</code> is <strong>true</strong> → <code>left++</code>. Drop the left end.`;
+  } else {
+    reason = `<span class="cr">arr[right] = ${rightVal}</span> is farther from or equal to x (distance <span class="ca">${dr}</span>) vs <span class="cl">arr[left] = ${leftVal}</span> (distance <span class="ca">${dl}</span>).<br>Condition <code>dl > dr</code> is <strong>false</strong> → <code>right--</code>. Drop the right end.`;
+  }
+
+  explain.innerHTML =
+    `<strong>Step ${stepCount}:</strong> Window [<span class="cl">${left}</span>, <span class="cr">${right}</span>], size = ${winSize}.<br>
+     ${reason}<br>
+     <span style="color:var(--muted)">Remaining drops needed: ${totalDrops - stepCount}</span>`;
+
+  // Actually move the pointer
+  if (dropLeft) left++;
+  else right--;
+
+  // Update pointer chips after move
+  setPointers(left, right);
+  // Re-render without drop highlight
+  setTimeout(() => {
+    if (!done) renderArray({ left, right, dropIdx: null, isFinal: false });
+  }, 350);
+}
+
+/* ── AUTO ───────────────────────────────────────────── */
+function startAuto() {
+  if (autoTimer) return;
+  btnAuto.classList.add('playing');
+  btnAuto.textContent = '⏸ Pause';
+  autoTimer = setInterval(() => { if (done) { stopAuto(); return; } step(); }, 1300);
+}
+function stopAuto() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  btnAuto.classList.remove('playing');
+  btnAuto.textContent = '⚡ Auto-play';
+}
+
+/* ── RESET ──────────────────────────────────────────── */
+function reset() {
+  stopAuto();
+  arr = []; k = 0; x = 0; left = 0; right = 0;
+  done = false; started = false; stepCount = 0; totalDrops = 0;
+
+  arrayWrap.innerHTML = '<span style="color:var(--muted);font-size:13px">Press <strong style="color:var(--cyan)">Start</strong> to load the array.</span>';
+  setPointers();
+  explain.innerHTML = 'Press <strong>Start</strong> to begin the walkthrough.';
+  condRow.innerHTML = '';
+  resBanner.classList.remove('show');
+  progress.style.width = '0%';
+  stepBadge.style.display = 'none';
+  highlightCode('none');
+
+  btnStart.disabled = false;
+  btnNext.disabled  = true;
+  btnAuto.disabled  = true;
+  btnReset.disabled = true;
+  inpArr.disabled = inpK.disabled = inpX.disabled = false;
+}
+
+/* ── Events ─────────────────────────────────────────── */
+btnStart.addEventListener('click', start);
+btnNext.addEventListener('click', step);
+btnAuto.addEventListener('click', () => autoTimer ? stopAuto() : startAuto());
+btnReset.addEventListener('click', reset);
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space'  && !btnNext.disabled)  { e.preventDefault(); step(); }
+  if (e.code === 'KeyR'   && !btnReset.disabled) { e.preventDefault(); reset(); }
+});
+</script>
+</body>
+</html>
